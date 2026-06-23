@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
 import { JobsService } from './jobs.service';
 
@@ -9,6 +9,11 @@ export class JobsController {
   @Get()
   findAll() {
     return this.jobsService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.jobsService.findOneOrFail(id);
   }
 
   @Post()

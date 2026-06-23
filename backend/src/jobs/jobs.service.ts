@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CreateJobDto } from './dto/create-job.dto';
 import { Job, JobSummary } from './job.types';
@@ -32,6 +36,16 @@ export class JobsService {
 
   findOne(id: string) {
     return this.jobs.get(id);
+  }
+
+  findOneOrFail(id: string) {
+    const job = this.findOne(id);
+
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    return job;
   }
 
   private toSummary(job: Job): JobSummary {
