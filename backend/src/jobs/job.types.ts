@@ -28,3 +28,14 @@ export interface Job {
   status: JobStatus;
   urls: UrlCheck[];
 }
+
+export interface JobSummary {
+  id: string;
+  createdAt: string;
+  status: JobStatus;
+  totalUrls: number;
+  stats: {
+    success: number;
+    error: number;
+  };
+}
