@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CreateJobDto } from './dto/create-job.dto';
-import { Job } from './job.types';
+import { Job, JobSummary } from './job.types';
 
 @Injectable()
 export class JobsService {
@@ -24,8 +24,39 @@ export class JobsService {
     return { jobId: job.id };
   }
 
+  findAll(): JobSummary[] {
+    return Array.from(this.jobs.values())
+      .reverse()
+      .map((job) => this.toSummary(job));
+  }
+
   findOne(id: string) {
     return this.jobs.get(id);
+  }
+
+  private toSummary(job: Job): JobSummary {
+    const stats = job.urls.reduce(
+      (result, url) => {
+        if (url.status === 'success') {
+          result.success += 1;
+        }
+
+        if (url.status === 'error') {
+          result.error += 1;
+        }
+
+        return result;
+      },
+      { success: 0, error: 0 },
+    );
+
+    return {
+      id: job.id,
+      createdAt: job.createdAt,
+      status: job.status,
+      totalUrls: job.urls.length,
+      stats,
+    };
   }
 
   private validateUrls(createJobDto: CreateJobDto) {
