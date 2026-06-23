@@ -1,10 +1,14 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
+import { JobsProcessorService } from './jobs-processor/jobs-processor.service';
 import { JobsService } from './jobs.service';
 
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly jobsProcessorService: JobsProcessorService,
+  ) {}
 
   @Get()
   findAll() {
@@ -18,6 +22,10 @@ export class JobsController {
 
   @Post()
   create(@Body() createJobDto: CreateJobDto) {
-    return this.jobsService.create(createJobDto);
+    const result = this.jobsService.create(createJobDto);
+
+    setImmediate(() => this.jobsProcessorService.process(result.jobId));
+
+    return result;
   }
 }
