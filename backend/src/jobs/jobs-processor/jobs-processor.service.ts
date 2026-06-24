@@ -19,11 +19,13 @@ export class JobsProcessorService {
 
       await this.processUrls(jobId);
 
-      this.jobsService.updateJobStatus(jobId, 'completed');
+      if (!this.jobsService.isCancelled(jobId)) {
+        this.jobsService.updateJobStatus(jobId, 'completed');
+      }
     } catch {
       const job = this.jobsService.findOne(jobId);
 
-      if (job) {
+      if (job && job.status !== 'cancelled') {
         this.jobsService.updateJobStatus(jobId, 'failed');
       }
     }
@@ -39,6 +41,10 @@ export class JobsProcessorService {
 
     const workers = Array.from({ length: workerCount }, async () => {
       while (nextUrlIndex < job.urls.length) {
+        if (this.jobsService.isCancelled(jobId)) {
+          return;
+        }
+
         const urlIndex = nextUrlIndex;
         nextUrlIndex += 1;
 
@@ -61,6 +67,12 @@ export class JobsProcessorService {
   }
 
   private async processUrl(jobId: string, urlIndex: number, url: string) {
+    const urlCheck = this.jobsService.findOneOrFail(jobId).urls[urlIndex];
+
+    if (this.jobsService.isCancelled(jobId) || urlCheck.status !== 'pending') {
+      return;
+    }
+
     const startedAt = new Date();
 
     this.jobsService.updateUrlCheck(jobId, urlIndex, {
