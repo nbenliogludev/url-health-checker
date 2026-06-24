@@ -56,6 +56,27 @@ export class JobsService {
     return job;
   }
 
+  cancel(id: string) {
+    const job = this.updateJobStatus(id, 'cancelled');
+
+    job.urls = job.urls.map((urlCheck) => {
+      if (urlCheck.status !== 'pending') {
+        return urlCheck;
+      }
+
+      return {
+        ...urlCheck,
+        status: 'cancelled',
+      };
+    });
+
+    return job;
+  }
+
+  isCancelled(id: string) {
+    return this.findOne(id)?.status === 'cancelled';
+  }
+
   updateUrlCheck(jobId: string, urlIndex: number, update: UrlCheckUpdate) {
     const job = this.findOneOrFail(jobId);
     const urlCheck = job.urls[urlIndex];
