@@ -1,18 +1,23 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  DEFAULT_JOB_URL_CONCURRENCY_LIMIT,
+  JOB_URL_CONCURRENCY_LIMIT_ENV,
+} from '../jobs.config';
 import { JobsService } from '../jobs.service';
 
 @Injectable()
 export class JobsProcessorService {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async process(jobId: string) {
     try {
       this.jobsService.updateJobStatus(jobId, 'in_progress');
-      const job = this.jobsService.findOneOrFail(jobId);
 
-      for (const [index, urlCheck] of job.urls.entries()) {
-        await this.processUrl(jobId, index, urlCheck.url);
-      }
+      await this.processUrls(jobId);
 
       this.jobsService.updateJobStatus(jobId, 'completed');
     } catch {
@@ -22,6 +27,37 @@ export class JobsProcessorService {
         this.jobsService.updateJobStatus(jobId, 'failed');
       }
     }
+  }
+
+  private async processUrls(jobId: string) {
+    const job = this.jobsService.findOneOrFail(jobId);
+    const workerCount = Math.min(
+      this.getUrlConcurrencyLimit(),
+      job.urls.length,
+    );
+    let nextUrlIndex = 0;
+
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (nextUrlIndex < job.urls.length) {
+        const urlIndex = nextUrlIndex;
+        nextUrlIndex += 1;
+
+        await this.processUrl(jobId, urlIndex, job.urls[urlIndex].url);
+      }
+    });
+
+    await Promise.all(workers);
+  }
+
+  private getUrlConcurrencyLimit() {
+    const value = this.configService.get<string>(JOB_URL_CONCURRENCY_LIMIT_ENV);
+    const parsedValue = Number(value);
+
+    if (Number.isInteger(parsedValue) && parsedValue > 0) {
+      return parsedValue;
+    }
+
+    return DEFAULT_JOB_URL_CONCURRENCY_LIMIT;
   }
 
   private async processUrl(jobId: string, urlIndex: number, url: string) {
