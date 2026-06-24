@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CreateJobDto } from './dto/create-job.dto';
-import { Job, JobSummary } from './job.types';
+import { Job, JobStatus, JobSummary, UrlCheckUpdate } from './job.types';
 
 @Injectable()
 export class JobsService {
@@ -46,6 +46,27 @@ export class JobsService {
     }
 
     return job;
+  }
+
+  updateJobStatus(id: string, status: JobStatus) {
+    const job = this.findOneOrFail(id);
+
+    job.status = status;
+
+    return job;
+  }
+
+  updateUrlCheck(jobId: string, urlIndex: number, update: UrlCheckUpdate) {
+    const job = this.findOneOrFail(jobId);
+    const urlCheck = job.urls[urlIndex];
+
+    if (!urlCheck) {
+      throw new NotFoundException('URL check not found');
+    }
+
+    Object.assign(urlCheck, update);
+
+    return urlCheck;
   }
 
   private toSummary(job: Job): JobSummary {

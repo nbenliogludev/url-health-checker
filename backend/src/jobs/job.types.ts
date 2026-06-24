@@ -22,6 +22,15 @@ export interface UrlCheck {
   durationMs?: number;
 }
 
+export interface UrlCheckUpdate {
+  status: UrlCheckStatus;
+  httpStatus?: number;
+  errorMessage?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+}
+
 export interface Job {
   id: string;
   createdAt: string;
