@@ -29,6 +29,23 @@ export type JobSummary = {
   }
 }
 
+export type UrlCheck = {
+  url: string
+  status: UrlCheckStatus
+  httpStatus?: number
+  errorMessage?: string
+  startedAt?: string
+  finishedAt?: string
+  durationMs?: number
+}
+
+export type JobDetails = {
+  id: string
+  createdAt: string
+  status: JobStatus
+  urls: UrlCheck[]
+}
+
 type CreateJobResponse = {
   jobId: string
 }
@@ -45,6 +62,12 @@ export async function createJob(urls: string[]) {
 
 export async function getJobs() {
   const { data } = await apiClient.get<JobSummary[]>('/jobs')
+
+  return data
+}
+
+export async function getJobDetails(jobId: string) {
+  const { data } = await apiClient.get<JobDetails>(`/jobs/${jobId}`)
 
   return data
 }
