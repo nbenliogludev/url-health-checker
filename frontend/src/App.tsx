@@ -1,119 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  Link2,
   ListFilter,
   LoaderCircle,
   Play,
   RefreshCw,
   SearchCheck,
-  XCircle,
 } from 'lucide-react'
-import { createJob, getApiErrorMessage } from './api/jobs'
-
-type JobStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'failed'
-type UrlCheckStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'success'
-  | 'error'
-  | 'cancelled'
-
-type JobSummary = {
-  id: string
-  createdAt: string
-  status: JobStatus
-  totalUrls: number
-  stats: {
-    success: number
-    error: number
-  }
-}
-
-type UrlCheck = {
-  url: string
-  status: UrlCheckStatus
-  httpStatus?: number
-  errorMessage?: string
-  startedAt?: string
-  finishedAt?: string
-  durationMs?: number
-}
-
-const jobs: JobSummary[] = [
-  {
-    id: 'a9f3c4d2',
-    createdAt: '2026-06-25 10:42',
-    status: 'in_progress',
-    totalUrls: 6,
-    stats: { success: 3, error: 1 },
-  },
-  {
-    id: 'bb7310fd',
-    createdAt: '2026-06-25 10:18',
-    status: 'completed',
-    totalUrls: 4,
-    stats: { success: 4, error: 0 },
-  },
-  {
-    id: 'c13e8a59',
-    createdAt: '2026-06-25 09:55',
-    status: 'cancelled',
-    totalUrls: 8,
-    stats: { success: 2, error: 0 },
-  },
-]
-
-const activeJob = jobs[0]
-
-const urlChecks: UrlCheck[] = [
-  {
-    url: 'https://example.com',
-    status: 'success',
-    httpStatus: 200,
-    startedAt: '10:42:11',
-    finishedAt: '10:42:14',
-    durationMs: 3210,
-  },
-  {
-    url: 'https://github.com',
-    status: 'success',
-    httpStatus: 200,
-    startedAt: '10:42:11',
-    finishedAt: '10:42:17',
-    durationMs: 6120,
-  },
-  {
-    url: 'https://example.com/not-found',
-    status: 'error',
-    httpStatus: 404,
-    errorMessage: 'HTTP status 404',
-    startedAt: '10:42:12',
-    finishedAt: '10:42:19',
-    durationMs: 7350,
-  },
-  {
-    url: 'https://vercel.com',
-    status: 'success',
-    httpStatus: 308,
-    startedAt: '10:42:12',
-    finishedAt: '10:42:15',
-    durationMs: 2890,
-  },
-  {
-    url: 'https://openai.com',
-    status: 'in_progress',
-    startedAt: '10:42:16',
-  },
-  {
-    url: 'https://bad-domain.test',
-    status: 'pending',
-  },
-]
+import type { JobStatus, UrlCheckStatus } from './api/jobs'
+import { useJobsStore } from './store/jobs'
 
 const statusLabel: Record<JobStatus | UrlCheckStatus, string> = {
   pending: 'Pending',
@@ -137,10 +36,22 @@ const statusClass: Record<JobStatus | UrlCheckStatus, string> = {
 
 function App() {
   const [urlInput, setUrlInput] = useState('https://example.com\nhttps://github.com')
-  const [createdJobId, setCreatedJobId] = useState<string | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [isCreatingJob, setIsCreatingJob] = useState(false)
+  const jobs = useJobsStore((state) => state.jobs)
+  const activeJobId = useJobsStore((state) => state.activeJobId)
+  const isLoadingJobs = useJobsStore((state) => state.isLoadingJobs)
+  const jobsError = useJobsStore((state) => state.jobsError)
+  const isCreatingJob = useJobsStore((state) => state.isCreatingJob)
+  const createError = useJobsStore((state) => state.createError)
+  const createdJobId = useJobsStore((state) => state.createdJobId)
+  const loadJobs = useJobsStore((state) => state.loadJobs)
+  const selectJob = useJobsStore((state) => state.selectJob)
+  const createJob = useJobsStore((state) => state.createJob)
 
+  useEffect(() => {
+    void loadJobs()
+  }, [loadJobs])
+
+  const activeJob = jobs.find((job) => job.id === activeJobId) ?? null
   const urlsToCreate = useMemo(
     () =>
       urlInput
@@ -149,28 +60,34 @@ function App() {
         .filter(Boolean),
     [urlInput],
   )
-  const processedUrls = activeJob.stats.success + activeJob.stats.error
-  const progress = Math.round((processedUrls / activeJob.totalUrls) * 100)
+  const totalSuccess = jobs.reduce((sum, job) => sum + job.stats.success, 0)
+  const totalErrors = jobs.reduce((sum, job) => sum + job.stats.error, 0)
+  const runningJobs = jobs.filter(
+    (job) => job.status === 'pending' || job.status === 'in_progress',
+  ).length
+  const activeProcessedUrls = activeJob
+    ? activeJob.stats.success + activeJob.stats.error
+    : 0
+  const activeRemainingUrls = activeJob
+    ? Math.max(activeJob.totalUrls - activeProcessedUrls, 0)
+    : 0
+  const progress =
+    activeJob && activeJob.totalUrls > 0
+      ? Math.round((activeProcessedUrls / activeJob.totalUrls) * 100)
+      : 0
   const canCreateJob = urlsToCreate.length > 0 && !isCreatingJob
 
   async function handleCreateJob(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setCreateError(null)
-    setCreatedJobId(null)
 
     if (!urlsToCreate.length) {
-      setCreateError('Add at least one URL')
       return
     }
 
-    try {
-      setIsCreatingJob(true)
-      const result = await createJob(urlsToCreate)
-      setCreatedJobId(result.jobId)
-    } catch (error) {
-      setCreateError(getApiErrorMessage(error))
-    } finally {
-      setIsCreatingJob(false)
+    const jobId = await createJob(urlsToCreate)
+
+    if (jobId) {
+      setUrlInput('')
     }
   }
 
@@ -192,27 +109,35 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50"
+                disabled={isLoadingJobs}
+                onClick={() => void loadJobs()}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:text-zinc-300"
                 aria-label="Refresh jobs"
                 title="Refresh jobs"
               >
-                <RefreshCw size={18} />
+                <RefreshCw size={18} className={isLoadingJobs ? 'animate-spin' : ''} />
               </button>
               <button
-                type="button"
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800"
+                type="submit"
+                form="create-job-form"
+                disabled={!canCreateJob}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
-                <Play size={17} />
+                {isCreatingJob ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Play size={17} />
+                )}
                 Run check
               </button>
             </div>
           </div>
 
           <section className="grid overflow-hidden rounded-md border border-zinc-200 bg-white sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Total jobs" value="12" icon={<ListFilter size={18} />} />
-            <Metric label="Running" value="2" icon={<LoaderCircle size={18} />} />
-            <Metric label="Success" value="41" icon={<CheckCircle2 size={18} />} />
-            <Metric label="Errors" value="7" icon={<AlertTriangle size={18} />} />
+            <Metric label="Total jobs" value={jobs.length.toString()} icon={<ListFilter size={18} />} />
+            <Metric label="Running" value={runningJobs.toString()} icon={<LoaderCircle size={18} />} />
+            <Metric label="Success" value={totalSuccess.toString()} icon={<CheckCircle2 size={18} />} />
+            <Metric label="Errors" value={totalErrors.toString()} icon={<AlertTriangle size={18} />} />
           </section>
         </div>
       </header>
@@ -223,7 +148,7 @@ function App() {
             <div className="border-b border-zinc-200 px-4 py-3">
               <h2 className="text-base font-semibold">New job</h2>
             </div>
-            <form className="space-y-4 p-4" onSubmit={handleCreateJob}>
+            <form id="create-job-form" className="space-y-4 p-4" onSubmit={handleCreateJob}>
               <label className="block text-sm font-medium text-zinc-700" htmlFor="urls">
                 URLs
               </label>
@@ -265,21 +190,40 @@ function App() {
               <h2 className="text-base font-semibold">Jobs</h2>
               <span className="text-sm text-zinc-500">{jobs.length}</span>
             </div>
+            {jobsError ? (
+              <div className="border-b border-zinc-200 p-4">
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                  {jobsError}
+                </div>
+              </div>
+            ) : null}
             <div className="divide-y divide-zinc-200">
-              {jobs.map((job, index) => (
+              {isLoadingJobs && jobs.length === 0 ? (
+                <div className="flex items-center gap-2 px-4 py-4 text-sm text-zinc-500">
+                  <LoaderCircle size={16} className="animate-spin" />
+                  Loading jobs
+                </div>
+              ) : null}
+              {!isLoadingJobs && jobs.length === 0 ? (
+                <div className="px-4 py-4 text-sm text-zinc-500">No jobs yet</div>
+              ) : null}
+              {jobs.map((job) => (
                 <button
                   key={job.id}
                   type="button"
+                  onClick={() => selectJob(job.id)}
                   className={`block w-full px-4 py-3 text-left transition hover:bg-zinc-50 ${
-                    index === 0 ? 'bg-cyan-50/60' : 'bg-white'
+                    activeJobId === job.id ? 'bg-cyan-50/60' : 'bg-white'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-mono text-sm text-zinc-900">{job.id}</span>
+                    <span className="truncate font-mono text-sm text-zinc-900">
+                      {job.id}
+                    </span>
                     <StatusBadge status={job.status} />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-sm text-zinc-500">
-                    <span>{job.createdAt}</span>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-sm text-zinc-500">
+                    <span>{formatDate(job.createdAt)}</span>
                     <span>{job.totalUrls} URLs</span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -297,53 +241,53 @@ function App() {
         </aside>
 
         <section className="rounded-md border border-zinc-200 bg-white">
-          <div className="border-b border-zinc-200 p-4">
-            <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold">Job {activeJob.id}</h2>
-                  <StatusBadge status={activeJob.status} />
+          {activeJob ? (
+            <>
+              <div className="border-b border-zinc-200 p-4">
+                <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-xl font-semibold">Job {activeJob.id}</h2>
+                      <StatusBadge status={activeJob.status} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-zinc-500">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3 size={15} />
+                        {formatDate(activeJob.createdAt)}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <SearchCheck size={15} />
+                        {activeProcessedUrls} of {activeJob.totalUrls}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-zinc-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 size={15} />
-                    {activeJob.createdAt}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <SearchCheck size={15} />
-                    {processedUrls} of {activeJob.totalUrls}
-                  </span>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex justify-between text-sm">
+                    <span className="text-zinc-600">Progress</span>
+                    <span className="font-medium text-zinc-900">{progress}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className="h-full rounded-full bg-cyan-600"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 text-sm font-medium text-rose-800 transition hover:bg-rose-100"
-              >
-                <XCircle size={17} />
-                Cancel job
-              </button>
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 flex justify-between text-sm">
-                <span className="text-zinc-600">Progress</span>
-                <span className="font-medium text-zinc-900">{progress}%</span>
+              <div className="grid divide-y divide-zinc-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                <JobStat label="Success" value={activeJob.stats.success.toString()} />
+                <JobStat label="Errors" value={activeJob.stats.error.toString()} />
+                <JobStat label="Remaining" value={activeRemainingUrls.toString()} />
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
-                <div
-                  className="h-full rounded-full bg-cyan-600"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+            </>
+          ) : (
+            <div className="px-4 py-10 text-center text-sm text-zinc-500">
+              No active job
             </div>
-          </div>
-
-          <div className="divide-y divide-zinc-200">
-            {urlChecks.map((item) => (
-              <UrlRow key={item.url} item={item} />
-            ))}
-          </div>
+          )}
         </section>
       </div>
     </main>
@@ -372,6 +316,15 @@ function Metric({
   )
 }
 
+function JobStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="px-4 py-4">
+      <p className="text-sm text-zinc-500">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-zinc-950">{value}</p>
+    </div>
+  )
+}
+
 function StatusBadge({ status }: { status: JobStatus | UrlCheckStatus }) {
   return (
     <span
@@ -382,27 +335,17 @@ function StatusBadge({ status }: { status: JobStatus | UrlCheckStatus }) {
   )
 }
 
-function UrlRow({ item }: { item: UrlCheck }) {
-  return (
-    <div className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_140px_120px_120px] xl:items-center">
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
-          <Link2 size={16} className="shrink-0 text-zinc-400" />
-          <p className="truncate font-mono text-sm text-zinc-950">{item.url}</p>
-        </div>
-        {item.errorMessage ? (
-          <p className="mt-1 text-sm text-rose-700">{item.errorMessage}</p>
-        ) : null}
-      </div>
-      <StatusBadge status={item.status} />
-      <div className="text-sm text-zinc-600">
-        {item.httpStatus ? `HTTP ${item.httpStatus}` : 'No status'}
-      </div>
-      <div className="text-sm text-zinc-600">
-        {item.durationMs ? `${item.durationMs} ms` : item.startedAt ?? 'Waiting'}
-      </div>
-    </div>
-  )
+function formatDate(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 export default App

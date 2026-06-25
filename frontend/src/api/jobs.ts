@@ -4,6 +4,31 @@ const apiClient = axios.create({
   baseURL: '/api',
 })
 
+export type JobStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'failed'
+
+export type UrlCheckStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'success'
+  | 'error'
+  | 'cancelled'
+
+export type JobSummary = {
+  id: string
+  createdAt: string
+  status: JobStatus
+  totalUrls: number
+  stats: {
+    success: number
+    error: number
+  }
+}
+
 type CreateJobResponse = {
   jobId: string
 }
@@ -18,7 +43,13 @@ export async function createJob(urls: string[]) {
   return data
 }
 
-export function getApiErrorMessage(error: unknown) {
+export async function getJobs() {
+  const { data } = await apiClient.get<JobSummary[]>('/jobs')
+
+  return data
+}
+
+export function getApiErrorMessage(error: unknown, fallback = 'Request failed') {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const message = error.response?.data?.message
 
@@ -31,5 +62,5 @@ export function getApiErrorMessage(error: unknown) {
     }
   }
 
-  return 'Failed to create job'
+  return fallback
 }
