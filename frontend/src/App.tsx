@@ -11,6 +11,7 @@ import {
   Play,
   RefreshCw,
   SearchCheck,
+  XCircle,
 } from 'lucide-react'
 import type { JobStatus, UrlCheckStatus } from './api/jobs'
 import { useJobsStore } from './store/jobs'
@@ -48,12 +49,15 @@ function App() {
   const jobsError = useJobsStore((state) => state.jobsError)
   const detailsError = useJobsStore((state) => state.detailsError)
   const isCreatingJob = useJobsStore((state) => state.isCreatingJob)
+  const isCancellingJob = useJobsStore((state) => state.isCancellingJob)
   const createError = useJobsStore((state) => state.createError)
+  const cancelError = useJobsStore((state) => state.cancelError)
   const createdJobId = useJobsStore((state) => state.createdJobId)
   const loadJobs = useJobsStore((state) => state.loadJobs)
   const refreshJob = useJobsStore((state) => state.refreshJob)
   const selectJob = useJobsStore((state) => state.selectJob)
   const createJob = useJobsStore((state) => state.createJob)
+  const cancelJob = useJobsStore((state) => state.cancelJob)
 
   useEffect(() => {
     void loadJobs()
@@ -90,6 +94,11 @@ function App() {
       ? Math.round((activeProcessedUrls / activeJob.totalUrls) * 100)
       : 0
   const canCreateJob = urlsToCreate.length > 0 && !isCreatingJob
+  const canCancelJob =
+    Boolean(activeJobId) &&
+    Boolean(activeJobStatus) &&
+    !isTerminalJobStatus(activeJobStatus) &&
+    !isCancellingJob
 
   useEffect(() => {
     if (
@@ -137,6 +146,14 @@ function App() {
     if (jobId) {
       setUrlInput('')
     }
+  }
+
+  async function handleCancelJob() {
+    if (!activeJobId || !canCancelJob) {
+      return
+    }
+
+    await cancelJob(activeJobId)
   }
 
   return (
@@ -309,6 +326,21 @@ function App() {
                       </span>
                     </div>
                   </div>
+                  {activeJobStatus && !isTerminalJobStatus(activeJobStatus) ? (
+                    <button
+                      type="button"
+                      disabled={!canCancelJob}
+                      onClick={() => void handleCancelJob()}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 text-sm font-medium text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400"
+                    >
+                      {isCancellingJob ? (
+                        <LoaderCircle size={17} className="animate-spin" />
+                      ) : (
+                        <XCircle size={17} />
+                      )}
+                      {isCancellingJob ? 'Cancelling' : 'Cancel job'}
+                    </button>
+                  ) : null}
                 </div>
 
                 <div className="mt-4">
@@ -330,6 +362,14 @@ function App() {
                 <JobStat label="Errors" value={activeJob.stats.error.toString()} />
                 <JobStat label="Remaining" value={activeRemainingUrls.toString()} />
               </div>
+
+              {cancelError ? (
+                <div className="border-b border-zinc-200 p-4">
+                  <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                    {cancelError}
+                  </div>
+                </div>
+              ) : null}
 
               {detailsError ? (
                 <div className="border-b border-zinc-200 p-4">
