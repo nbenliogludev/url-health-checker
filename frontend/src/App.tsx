@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Link2,
   ListFilter,
   LoaderCircle,
   Play,
@@ -38,8 +39,11 @@ function App() {
   const [urlInput, setUrlInput] = useState('https://example.com\nhttps://github.com')
   const jobs = useJobsStore((state) => state.jobs)
   const activeJobId = useJobsStore((state) => state.activeJobId)
+  const activeJobDetails = useJobsStore((state) => state.activeJobDetails)
   const isLoadingJobs = useJobsStore((state) => state.isLoadingJobs)
+  const isLoadingDetails = useJobsStore((state) => state.isLoadingDetails)
   const jobsError = useJobsStore((state) => state.jobsError)
+  const detailsError = useJobsStore((state) => state.detailsError)
   const isCreatingJob = useJobsStore((state) => state.isCreatingJob)
   const createError = useJobsStore((state) => state.createError)
   const createdJobId = useJobsStore((state) => state.createdJobId)
@@ -52,6 +56,7 @@ function App() {
   }, [loadJobs])
 
   const activeJob = jobs.find((job) => job.id === activeJobId) ?? null
+  const activeUrlChecks = activeJobDetails?.urls ?? []
   const urlsToCreate = useMemo(
     () =>
       urlInput
@@ -65,9 +70,13 @@ function App() {
   const runningJobs = jobs.filter(
     (job) => job.status === 'pending' || job.status === 'in_progress',
   ).length
-  const activeProcessedUrls = activeJob
-    ? activeJob.stats.success + activeJob.stats.error
-    : 0
+  const activeProcessedUrls = activeJobDetails
+    ? activeUrlChecks.filter((item) =>
+        ['success', 'error', 'cancelled'].includes(item.status),
+      ).length
+    : activeJob
+      ? activeJob.stats.success + activeJob.stats.error
+      : 0
   const activeRemainingUrls = activeJob
     ? Math.max(activeJob.totalUrls - activeProcessedUrls, 0)
     : 0
@@ -207,11 +216,11 @@ function App() {
               {!isLoadingJobs && jobs.length === 0 ? (
                 <div className="px-4 py-4 text-sm text-zinc-500">No jobs yet</div>
               ) : null}
-              {jobs.map((job) => (
+                  {jobs.map((job) => (
                 <button
                   key={job.id}
                   type="button"
-                  onClick={() => selectJob(job.id)}
+                  onClick={() => void selectJob(job.id)}
                   className={`block w-full px-4 py-3 text-left transition hover:bg-zinc-50 ${
                     activeJobId === job.id ? 'bg-cyan-50/60' : 'bg-white'
                   }`}
@@ -248,12 +257,12 @@ function App() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-semibold">Job {activeJob.id}</h2>
-                      <StatusBadge status={activeJob.status} />
+                      <StatusBadge status={activeJobDetails?.status ?? activeJob.status} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-zinc-500">
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 size={15} />
-                        {formatDate(activeJob.createdAt)}
+                        {formatDate(activeJobDetails?.createdAt ?? activeJob.createdAt)}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <SearchCheck size={15} />
@@ -277,11 +286,40 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid divide-y divide-zinc-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="grid divide-y divide-zinc-200 border-b border-zinc-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 <JobStat label="Success" value={activeJob.stats.success.toString()} />
                 <JobStat label="Errors" value={activeJob.stats.error.toString()} />
                 <JobStat label="Remaining" value={activeRemainingUrls.toString()} />
               </div>
+
+              {detailsError ? (
+                <div className="border-b border-zinc-200 p-4">
+                  <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                    {detailsError}
+                  </div>
+                </div>
+              ) : null}
+
+              {isLoadingDetails ? (
+                <div className="flex items-center gap-2 px-4 py-4 text-sm text-zinc-500">
+                  <LoaderCircle size={16} className="animate-spin" />
+                  Loading details
+                </div>
+              ) : null}
+
+              {!isLoadingDetails && activeUrlChecks.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-zinc-500">
+                  No URLs
+                </div>
+              ) : null}
+
+              {activeUrlChecks.length > 0 ? (
+                <div className="divide-y divide-zinc-200">
+                  {activeUrlChecks.map((item) => (
+                    <UrlRow key={item.url} item={item} />
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="px-4 py-10 text-center text-sm text-zinc-500">
@@ -335,6 +373,41 @@ function StatusBadge({ status }: { status: JobStatus | UrlCheckStatus }) {
   )
 }
 
+function UrlRow({
+  item,
+}: {
+  item: {
+    url: string
+    status: UrlCheckStatus
+    httpStatus?: number
+    errorMessage?: string
+    startedAt?: string
+    finishedAt?: string
+    durationMs?: number
+  }
+}) {
+  return (
+    <div className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_140px_120px_160px] xl:items-center">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link2 size={16} className="shrink-0 text-zinc-400" />
+          <p className="truncate font-mono text-sm text-zinc-950">{item.url}</p>
+        </div>
+        {item.errorMessage ? (
+          <p className="mt-1 text-sm text-rose-700">{item.errorMessage}</p>
+        ) : null}
+      </div>
+      <StatusBadge status={item.status} />
+      <div className="text-sm text-zinc-600">
+        {item.httpStatus ? `HTTP ${item.httpStatus}` : 'No status'}
+      </div>
+      <div className="text-sm text-zinc-600">
+        {formatUrlCheckTiming(item)}
+      </div>
+    </div>
+  )
+}
+
 function formatDate(value: string) {
   const date = new Date(value)
 
@@ -346,6 +419,34 @@ function formatDate(value: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function formatTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    timeStyle: 'medium',
+  }).format(date)
+}
+
+function formatUrlCheckTiming(item: {
+  startedAt?: string
+  finishedAt?: string
+  durationMs?: number
+}) {
+  if (item.durationMs) {
+    return `${item.durationMs} ms`
+  }
+
+  if (item.startedAt) {
+    return formatTime(item.startedAt)
+  }
+
+  return 'Waiting'
 }
 
 export default App
