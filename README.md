@@ -1,10 +1,6 @@
 # URL Health Checker
 
-Fullstack app for asynchronous URL checks.
-
-You paste a list of URLs, create a job, and the backend checks every URL in the background with HTTP `HEAD` requests. The frontend shows the job list, live progress, per-URL results, HTTP status codes, errors, and allows cancelling a running job.
-
-The project is intentionally small, but it has the things I would expect from a real service: API docs, Docker setup, metrics, a Grafana dashboard, and Sentry for error monitoring.
+Fullstack app for asynchronous URL checks. It lets you create background jobs from URL lists, track progress, review results, and cancel running checks.
 
 ## What It Can Do
 
@@ -34,6 +30,15 @@ Data is stored in memory, so jobs are reset after the backend restarts.
 ### Sentry
 
 ![Sentry issues](docs/sentry.png)
+
+## Project Structure
+
+```text
+backend/        NestJS API and background job processing
+frontend/       React app
+observability/  Prometheus and Grafana config
+docs/           Screenshots for README
+```
 
 ## Tech Stack
 
@@ -79,21 +84,21 @@ docker compose down
 
 Sentry is optional. The app works without it.
 
-If you want to enable Sentry locally, copy the example file and add your own DSNs:
+For Docker, copy the root example file and adjust values if needed:
 
 ```bash
 cp .env.example .env
 ```
 
-Useful variables:
+Main variables:
 
-```text
-SENTRY_DSN=
-VITE_SENTRY_DSN=
-JOB_URL_CONCURRENCY_LIMIT=5
-```
+| Variable | Description |
+| --- | --- |
+| `SENTRY_DSN` | Backend Sentry DSN |
+| `VITE_SENTRY_DSN` | Frontend Sentry DSN |
+| `JOB_URL_CONCURRENCY_LIMIT` | How many URLs can be checked at the same time inside one job. Default is `5`. |
 
-`SENTRY_DSN` is used by the backend, `VITE_SENTRY_DSN` is used by the frontend.
+If `JOB_URL_CONCURRENCY_LIMIT=10`, one job can process up to 10 URLs in parallel. Several jobs can still run at the same time.
 
 ## Manual Run
 
@@ -206,13 +211,4 @@ Frontend:
 cd frontend
 npm run lint
 npm run build
-```
-
-## Project Structure
-
-```text
-backend/        NestJS API and background job processing
-frontend/       React app
-observability/  Prometheus and Grafana config
-docs/           Screenshots for README
 ```
