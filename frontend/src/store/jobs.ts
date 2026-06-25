@@ -21,6 +21,7 @@ type JobsState = {
   createdJobId: string | null
   loadJobs: () => Promise<void>
   loadJobDetails: (jobId: string) => Promise<void>
+  refreshJob: (jobId: string) => Promise<JobDetails | null>
   selectJob: (jobId: string) => Promise<void>
   createJob: (urls: string[]) => Promise<string | null>
 }
@@ -73,12 +74,52 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     try {
       const activeJobDetails = await getJobDetails(jobId)
 
+      if (get().activeJobId !== jobId) {
+        return
+      }
+
       set({ activeJobDetails, isLoadingDetails: false })
     } catch (error) {
+      if (get().activeJobId !== jobId) {
+        return
+      }
+
       set({
         detailsError: getApiErrorMessage(error, 'Failed to load job details'),
         isLoadingDetails: false,
       })
+    }
+  },
+
+  refreshJob: async (jobId) => {
+    try {
+      const [jobs, activeJobDetails] = await Promise.all([
+        getJobs(),
+        getJobDetails(jobId),
+      ])
+
+      if (get().activeJobId !== jobId) {
+        return null
+      }
+
+      set({
+        jobs,
+        activeJobDetails,
+        jobsError: null,
+        detailsError: null,
+      })
+
+      return activeJobDetails
+    } catch (error) {
+      if (get().activeJobId !== jobId) {
+        return null
+      }
+
+      set({
+        detailsError: getApiErrorMessage(error, 'Failed to refresh job'),
+      })
+
+      return null
     }
   },
 
