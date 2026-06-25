@@ -35,6 +35,9 @@ const statusClass: Record<JobStatus | UrlCheckStatus, string> = {
   error: 'bg-rose-50 text-rose-800 ring-rose-200',
 }
 
+const POLLING_INTERVAL_MS = 2000
+const TERMINAL_JOB_STATUSES: JobStatus[] = ['completed', 'cancelled', 'failed']
+
 function App() {
   const [urlInput, setUrlInput] = useState('https://example.com\nhttps://github.com')
   const jobs = useJobsStore((state) => state.jobs)
@@ -48,6 +51,7 @@ function App() {
   const createError = useJobsStore((state) => state.createError)
   const createdJobId = useJobsStore((state) => state.createdJobId)
   const loadJobs = useJobsStore((state) => state.loadJobs)
+  const refreshJob = useJobsStore((state) => state.refreshJob)
   const selectJob = useJobsStore((state) => state.selectJob)
   const createJob = useJobsStore((state) => state.createJob)
 
@@ -56,6 +60,7 @@ function App() {
   }, [loadJobs])
 
   const activeJob = jobs.find((job) => job.id === activeJobId) ?? null
+  const activeJobStatus = activeJobDetails?.status ?? activeJob?.status
   const activeUrlChecks = activeJobDetails?.urls ?? []
   const urlsToCreate = useMemo(
     () =>
@@ -85,6 +90,40 @@ function App() {
       ? Math.round((activeProcessedUrls / activeJob.totalUrls) * 100)
       : 0
   const canCreateJob = urlsToCreate.length > 0 && !isCreatingJob
+
+  useEffect(() => {
+    if (
+      !activeJobId ||
+      !activeJobStatus ||
+      isTerminalJobStatus(activeJobStatus)
+    ) {
+      return
+    }
+
+    const jobId = activeJobId
+    let isCurrent = true
+    let timeoutId: number | undefined
+
+    async function poll() {
+      const jobDetails = await refreshJob(jobId)
+
+      if (!isCurrent || isTerminalJobStatus(jobDetails?.status)) {
+        return
+      }
+
+      timeoutId = window.setTimeout(poll, POLLING_INTERVAL_MS)
+    }
+
+    timeoutId = window.setTimeout(poll, POLLING_INTERVAL_MS)
+
+    return () => {
+      isCurrent = false
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [activeJobId, activeJobStatus, refreshJob])
 
   async function handleCreateJob(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -371,6 +410,10 @@ function StatusBadge({ status }: { status: JobStatus | UrlCheckStatus }) {
       {statusLabel[status]}
     </span>
   )
+}
+
+function isTerminalJobStatus(status?: JobStatus) {
+  return status ? TERMINAL_JOB_STATUSES.includes(status) : false
 }
 
 function UrlRow({
