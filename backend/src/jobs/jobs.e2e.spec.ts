@@ -105,6 +105,20 @@ describe('Jobs API (e2e)', () => {
         ],
       }),
     );
+
+    const metricsResponse = await app.inject({
+      method: 'GET',
+      url: '/api/metrics',
+    });
+
+    expect(metricsResponse.statusCode).toBe(200);
+    expect(metricsResponse.headers['content-type']).toContain('text/plain');
+    expect(metricsResponse.body).toContain(
+      'url_health_checker_jobs_created_total',
+    );
+    expect(metricsResponse.body).toContain(
+      'url_health_checker_jobs_finished_total',
+    );
   });
 
   it('returns validation and not found errors', async () => {

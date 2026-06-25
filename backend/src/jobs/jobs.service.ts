@@ -2,14 +2,18 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { MetricsService } from '../metrics/metrics.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { Job, JobStatus, JobSummary, UrlCheckUpdate } from './job.types';
 
 @Injectable()
 export class JobsService {
   private readonly jobs = new Map<string, Job>();
+
+  constructor(@Optional() private readonly metricsService?: MetricsService) {}
 
   create(createJobDto: CreateJobDto) {
     const urls = this.validateUrls(createJobDto);
@@ -24,6 +28,7 @@ export class JobsService {
     };
 
     this.jobs.set(job.id, job);
+    this.metricsService?.recordJobCreated(job.urls.length);
 
     return { jobId: job.id };
   }
@@ -50,8 +55,10 @@ export class JobsService {
 
   updateJobStatus(id: string, status: JobStatus) {
     const job = this.findOneOrFail(id);
+    const previousStatus = job.status;
 
     job.status = status;
+    this.metricsService?.recordJobStatusChange(previousStatus, status);
 
     return job;
   }
@@ -63,6 +70,11 @@ export class JobsService {
       if (urlCheck.status !== 'pending') {
         return urlCheck;
       }
+
+      this.metricsService?.recordUrlCheckStatusChange('pending', 'cancelled');
+      this.metricsService?.recordUrlCheckFinished({
+        result: 'cancelled',
+      });
 
       return {
         ...urlCheck,
@@ -85,7 +97,13 @@ export class JobsService {
       throw new NotFoundException('URL check not found');
     }
 
+    const previousStatus = urlCheck.status;
+
     Object.assign(urlCheck, update);
+    this.metricsService?.recordUrlCheckStatusChange(
+      previousStatus,
+      urlCheck.status,
+    );
 
     return urlCheck;
   }

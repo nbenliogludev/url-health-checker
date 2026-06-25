@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: URL Health Checker
+    orgId: 1
+    folder: URL Health Checker
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
