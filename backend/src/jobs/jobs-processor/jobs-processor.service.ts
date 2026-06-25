@@ -15,6 +15,10 @@ export class JobsProcessorService {
 
   async process(jobId: string) {
     try {
+      if (this.jobsService.isCancelled(jobId)) {
+        return;
+      }
+
       this.jobsService.updateJobStatus(jobId, 'in_progress');
 
       await this.processUrls(jobId);
