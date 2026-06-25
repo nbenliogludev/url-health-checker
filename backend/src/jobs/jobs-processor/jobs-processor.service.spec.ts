@@ -19,7 +19,7 @@ describe('JobsProcessorService', () => {
 
     jest
       .spyOn(service as any, 'delayBeforeSavingResult')
-      .mockResolvedValue(undefined);
+      .mockResolvedValue(0);
   });
 
   afterEach(() => {
