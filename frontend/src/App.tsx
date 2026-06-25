@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -11,6 +13,7 @@ import {
   SearchCheck,
   XCircle,
 } from 'lucide-react'
+import { createJob, getApiErrorMessage } from './api/jobs'
 
 type JobStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'failed'
 type UrlCheckStatus =
@@ -133,8 +136,43 @@ const statusClass: Record<JobStatus | UrlCheckStatus, string> = {
 }
 
 function App() {
+  const [urlInput, setUrlInput] = useState('https://example.com\nhttps://github.com')
+  const [createdJobId, setCreatedJobId] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreatingJob, setIsCreatingJob] = useState(false)
+
+  const urlsToCreate = useMemo(
+    () =>
+      urlInput
+        .split('\n')
+        .map((url) => url.trim())
+        .filter(Boolean),
+    [urlInput],
+  )
   const processedUrls = activeJob.stats.success + activeJob.stats.error
   const progress = Math.round((processedUrls / activeJob.totalUrls) * 100)
+  const canCreateJob = urlsToCreate.length > 0 && !isCreatingJob
+
+  async function handleCreateJob(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setCreateError(null)
+    setCreatedJobId(null)
+
+    if (!urlsToCreate.length) {
+      setCreateError('Add at least one URL')
+      return
+    }
+
+    try {
+      setIsCreatingJob(true)
+      const result = await createJob(urlsToCreate)
+      setCreatedJobId(result.jobId)
+    } catch (error) {
+      setCreateError(getApiErrorMessage(error))
+    } finally {
+      setIsCreatingJob(false)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#f6f7f2] text-zinc-950">
@@ -185,24 +223,41 @@ function App() {
             <div className="border-b border-zinc-200 px-4 py-3">
               <h2 className="text-base font-semibold">New job</h2>
             </div>
-            <div className="space-y-4 p-4">
+            <form className="space-y-4 p-4" onSubmit={handleCreateJob}>
               <label className="block text-sm font-medium text-zinc-700" htmlFor="urls">
                 URLs
               </label>
               <textarea
                 id="urls"
                 rows={7}
+                value={urlInput}
+                onChange={(event) => setUrlInput(event.target.value)}
                 className="w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm leading-6 text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950/10"
                 placeholder={'https://example.com\nhttps://github.com'}
               />
+              {createError ? (
+                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                  {createError}
+                </p>
+              ) : null}
+              {createdJobId ? (
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  Created job <span className="font-mono">{createdJobId}</span>
+                </p>
+              ) : null}
               <button
-                type="button"
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800"
+                type="submit"
+                disabled={!canCreateJob}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
-                <Play size={17} />
-                Start job
+                {isCreatingJob ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Play size={17} />
+                )}
+                {isCreatingJob ? 'Creating job' : 'Start job'}
               </button>
-            </div>
+            </form>
           </section>
 
           <section className="rounded-md border border-zinc-200 bg-white">
@@ -302,7 +357,7 @@ function Metric({
 }: {
   label: string
   value: string
-  icon: React.ReactNode
+  icon: ReactNode
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 last:border-b-0 sm:odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
