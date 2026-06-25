@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { create } from 'zustand'
 import {
   cancelJob as cancelJobRequest,
@@ -63,6 +64,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         set({ activeJobDetails: null })
       }
     } catch (error) {
+      Sentry.captureException(error)
       set({
         jobsError: getApiErrorMessage(error, 'Failed to load jobs'),
         isLoadingJobs: false,
@@ -90,6 +92,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         return
       }
 
+      Sentry.captureException(error)
       set({
         detailsError: getApiErrorMessage(error, 'Failed to load job details'),
         isLoadingDetails: false,
@@ -121,6 +124,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         return null
       }
 
+      Sentry.captureException(error)
       set({
         detailsError: getApiErrorMessage(error, 'Failed to refresh job'),
       })
@@ -147,11 +151,17 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         createdJobId: result.jobId,
         isCreatingJob: false,
       })
+      Sentry.metrics.count('job.created', 1, {
+        attributes: {
+          url_count: urls.length,
+        },
+      })
 
       await get().loadJobDetails(result.jobId)
 
       return result.jobId
     } catch (error) {
+      Sentry.captureException(error)
       set({
         createError: getApiErrorMessage(error, 'Failed to create job'),
         isCreatingJob: false,
@@ -179,9 +189,11 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         isCancellingJob: false,
         detailsError: null,
       })
+      Sentry.metrics.count('job.cancelled', 1)
 
       return activeJobDetails
     } catch (error) {
+      Sentry.captureException(error)
       set({
         cancelError: getApiErrorMessage(error, 'Failed to cancel job'),
         isCancellingJob: false,

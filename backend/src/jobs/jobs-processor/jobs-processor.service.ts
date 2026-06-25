@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as Sentry from '@sentry/nestjs';
 import { MetricsService } from '../../metrics/metrics.service';
 import {
   DEFAULT_JOB_URL_CONCURRENCY_LIMIT,
@@ -16,6 +17,17 @@ export class JobsProcessorService {
   ) {}
 
   async process(jobId: string) {
+    return Sentry.withIsolationScope(async (scope) => {
+      scope.setTag('job.id', jobId);
+      scope.setContext('job', {
+        id: jobId,
+      });
+
+      await this.processJob(jobId);
+    });
+  }
+
+  private async processJob(jobId: string) {
     try {
       if (this.jobsService.isCancelled(jobId)) {
         return;
@@ -28,10 +40,11 @@ export class JobsProcessorService {
       if (!this.jobsService.isCancelled(jobId)) {
         this.jobsService.updateJobStatus(jobId, 'completed');
       }
-    } catch {
+    } catch (error) {
       const job = this.jobsService.findOne(jobId);
 
       if (job && job.status !== 'cancelled') {
+        Sentry.captureException(error);
         this.jobsService.updateJobStatus(jobId, 'failed');
       }
     }
@@ -89,7 +102,18 @@ export class JobsProcessorService {
 
     try {
       const requestStartedAt = Date.now();
-      const response = await fetch(url, { method: 'HEAD' });
+      const response = await Sentry.startSpan(
+        {
+          name: 'HEAD request',
+          op: 'http.client',
+          attributes: {
+            'job.id': jobId,
+            'url.index': urlIndex,
+            url,
+          },
+        },
+        () => fetch(url, { method: 'HEAD' }),
+      );
       requestDurationMs = Date.now() - requestStartedAt;
       const headResult =
         response.status >= 200 && response.status < 400
@@ -120,6 +144,18 @@ export class JobsProcessorService {
           httpStatus: response.status,
           durationMs,
         });
+        Sentry.metrics.count('url_check.finished', 1, {
+          attributes: {
+            result: 'success',
+            status_code: response.status,
+          },
+        });
+        Sentry.metrics.distribution('url_check.duration', durationMs, {
+          unit: 'millisecond',
+          attributes: {
+            result: 'success',
+          },
+        });
 
         return;
       }
@@ -135,6 +171,18 @@ export class JobsProcessorService {
         result: 'error',
         httpStatus: response.status,
         durationMs,
+      });
+      Sentry.metrics.count('url_check.finished', 1, {
+        attributes: {
+          result: 'error',
+          status_code: response.status,
+        },
+      });
+      Sentry.metrics.distribution('url_check.duration', durationMs, {
+        unit: 'millisecond',
+        attributes: {
+          result: 'error',
+        },
       });
     } catch (error) {
       if (requestDurationMs === 0) {
@@ -161,6 +209,19 @@ export class JobsProcessorService {
       this.metricsService?.recordUrlCheckFinished({
         result: 'error',
         durationMs,
+      });
+      Sentry.captureException(error);
+      Sentry.metrics.count('url_check.finished', 1, {
+        attributes: {
+          result: 'error',
+          status_code: 'none',
+        },
+      });
+      Sentry.metrics.distribution('url_check.duration', durationMs, {
+        unit: 'millisecond',
+        attributes: {
+          result: 'error',
+        },
       });
     }
   }

@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { randomUUID } from 'crypto';
 import { MetricsService } from '../metrics/metrics.service';
 import { CreateJobDto } from './dto/create-job.dto';
@@ -29,6 +30,11 @@ export class JobsService {
 
     this.jobs.set(job.id, job);
     this.metricsService?.recordJobCreated(job.urls.length);
+    Sentry.metrics.count('job.created', 1, {
+      attributes: {
+        url_count: job.urls.length,
+      },
+    });
 
     return { jobId: job.id };
   }
@@ -59,6 +65,14 @@ export class JobsService {
 
     job.status = status;
     this.metricsService?.recordJobStatusChange(previousStatus, status);
+
+    if (status === 'completed' || status === 'cancelled' || status === 'failed') {
+      Sentry.metrics.count('job.finished', 1, {
+        attributes: {
+          status,
+        },
+      });
+    }
 
     return job;
   }

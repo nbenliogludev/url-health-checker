@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AppHeader } from './components/app-header'
@@ -31,6 +32,11 @@ function App() {
   useEffect(() => {
     void loadJobs()
   }, [loadJobs])
+
+  useEffect(() => {
+    Sentry.setTag('job.active_id', activeJobId ?? 'none')
+    Sentry.setTag('job.active_status', activeJobDetails?.status ?? 'none')
+  }, [activeJobDetails?.status, activeJobId])
 
   const activeJob = jobs.find((job) => job.id === activeJobId) ?? null
   const activeJobStatus = activeJobDetails?.status ?? activeJob?.status

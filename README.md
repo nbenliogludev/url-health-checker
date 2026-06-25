@@ -61,3 +61,14 @@ Tracked metrics include:
 - artificial result save delay
 - API request count and latency
 - configured per-job URL concurrency limit
+
+## Sentry
+
+Sentry is optional. Copy `.env.example` to `.env` and set project DSNs:
+
+```text
+SENTRY_DSN=...
+VITE_SENTRY_DSN=...
+```
+
+Backend uses `@sentry/nestjs` for error monitoring, tracing and background job isolation. Frontend uses `@sentry/react` for browser errors, tracing and session replay.
