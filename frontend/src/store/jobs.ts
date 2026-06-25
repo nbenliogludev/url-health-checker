@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import {
+  cancelJob as cancelJobRequest,
   createJob as createJobRequest,
   getApiErrorMessage,
   getJobDetails,
@@ -17,13 +18,16 @@ type JobsState = {
   jobsError: string | null
   detailsError: string | null
   isCreatingJob: boolean
+  isCancellingJob: boolean
   createError: string | null
+  cancelError: string | null
   createdJobId: string | null
   loadJobs: () => Promise<void>
   loadJobDetails: (jobId: string) => Promise<void>
   refreshJob: (jobId: string) => Promise<JobDetails | null>
   selectJob: (jobId: string) => Promise<void>
   createJob: (urls: string[]) => Promise<string | null>
+  cancelJob: (jobId: string) => Promise<JobDetails | null>
 }
 
 export const useJobsStore = create<JobsState>((set, get) => ({
@@ -35,7 +39,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   jobsError: null,
   detailsError: null,
   isCreatingJob: false,
+  isCancellingJob: false,
   createError: null,
+  cancelError: null,
   createdJobId: null,
 
   loadJobs: async () => {
@@ -149,6 +155,36 @@ export const useJobsStore = create<JobsState>((set, get) => ({
       set({
         createError: getApiErrorMessage(error, 'Failed to create job'),
         isCreatingJob: false,
+      })
+
+      return null
+    }
+  },
+
+  cancelJob: async (jobId) => {
+    set({ isCancellingJob: true, cancelError: null })
+
+    try {
+      const activeJobDetails = await cancelJobRequest(jobId)
+      const jobs = await getJobs()
+
+      if (get().activeJobId !== jobId) {
+        set({ jobs, isCancellingJob: false })
+        return activeJobDetails
+      }
+
+      set({
+        jobs,
+        activeJobDetails,
+        isCancellingJob: false,
+        detailsError: null,
+      })
+
+      return activeJobDetails
+    } catch (error) {
+      set({
+        cancelError: getApiErrorMessage(error, 'Failed to cancel job'),
+        isCancellingJob: false,
       })
 
       return null

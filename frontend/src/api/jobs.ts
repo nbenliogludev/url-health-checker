@@ -72,6 +72,12 @@ export async function getJobDetails(jobId: string) {
   return data
 }
 
+export async function cancelJob(jobId: string) {
+  const { data } = await apiClient.delete<JobDetails>(`/jobs/${jobId}`)
+
+  return data
+}
+
 export function getApiErrorMessage(error: unknown, fallback = 'Request failed') {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const message = error.response?.data?.message
