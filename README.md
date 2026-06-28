@@ -5,8 +5,11 @@ Fullstack app for asynchronous URL checks. It lets you create background jobs fr
 ## What It Can Do
 
 - Create a job from a list of URLs.
+- Deduplicates URLs before processing.
+- Limits maximum URLs per job to prevent abuse.
 - Process URL checks asynchronously in the background.
 - Limit concurrent URL checks per job.
+- Prevents memory leaks by cleaning up old jobs.
 - Show all jobs with status and success/error stats.
 - Show detailed status for every URL in a job.
 - Cancel a job and skip URLs that have not started yet.
