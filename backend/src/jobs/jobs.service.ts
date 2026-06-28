@@ -10,6 +10,13 @@ import { MetricsService } from '../metrics/metrics.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { Job, JobStatus, JobSummary, UrlCheckUpdate } from './job.types';
 
+const TERMINAL_JOB_STATUSES: JobStatus[] = [
+  'completed',
+  'cancelled',
+  'failed',
+];
+const MAX_STORED_JOBS = 100;
+
 @Injectable()
 export class JobsService {
   private readonly jobs = new Map<string, Job>();
@@ -35,6 +42,8 @@ export class JobsService {
         url_count: job.urls.length,
       },
     });
+
+    this.cleanupOldJobs();
 
     return { jobId: job.id };
   }
@@ -180,6 +189,26 @@ export class JobsService {
       return parsedUrl.toString();
     } catch {
       throw new BadRequestException(`urls[${index}] must be a valid URL`);
+    }
+  }
+
+  private cleanupOldJobs() {
+    if (this.jobs.size <= MAX_STORED_JOBS) {
+      return;
+    }
+
+    const jobsToRemove = this.jobs.size - MAX_STORED_JOBS;
+    let removedCount = 0;
+
+    for (const [id, job] of this.jobs.entries()) {
+      if (TERMINAL_JOB_STATUSES.includes(job.status)) {
+        this.jobs.delete(id);
+        removedCount += 1;
+
+        if (removedCount >= jobsToRemove) {
+          break;
+        }
+      }
     }
   }
 }
