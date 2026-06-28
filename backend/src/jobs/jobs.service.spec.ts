@@ -45,6 +45,9 @@ describe('JobsService', () => {
     expect(() =>
       service.create({ urls: ['not-a-url'] }),
     ).toThrow(BadRequestException);
+    expect(() =>
+      service.create({ urls: Array(1001).fill('https://example.com') }),
+    ).toThrow(BadRequestException);
   });
 
   it('returns summaries in newest-first order with success and error stats', () => {
