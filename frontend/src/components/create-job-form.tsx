@@ -3,6 +3,7 @@ import { LoaderCircle, Play } from 'lucide-react'
 
 type CreateJobFormProps = {
   urlInput: string
+  urlsCount: number
   createError: string | null
   createdJobId: string | null
   isCreatingJob: boolean
@@ -13,6 +14,7 @@ type CreateJobFormProps = {
 
 export function CreateJobForm({
   urlInput,
+  urlsCount,
   createError,
   createdJobId,
   isCreatingJob,
@@ -22,19 +24,24 @@ export function CreateJobForm({
 }: CreateJobFormProps) {
   return (
     <section className="rounded-md border border-zinc-200 bg-white">
-      <div className="border-b border-zinc-200 px-4 py-3">
+      <div className="border-b border-zinc-200 px-4 py-3 flex items-center justify-between">
         <h2 className="text-base font-semibold">New job</h2>
+        {urlsCount > 0 && (
+          <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 ring-1 ring-inset ring-zinc-500/10">
+            {urlsCount} unique URL{urlsCount !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
       <form id="create-job-form" className="space-y-4 p-4" onSubmit={onSubmit}>
         <label className="block text-sm font-medium text-zinc-700" htmlFor="urls">
-          URLs
+          URLs to check
         </label>
         <textarea
           id="urls"
-          rows={7}
+          rows={12}
           value={urlInput}
           onChange={(event) => onUrlInputChange(event.target.value)}
-          className="w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm leading-6 text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950/10"
+          className="w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm leading-6 text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950/10 min-h-[200px]"
           placeholder={'https://example.com\nhttps://github.com'}
         />
         {createError ? (

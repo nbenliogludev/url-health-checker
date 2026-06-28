@@ -41,14 +41,13 @@ function App() {
   const activeJob = jobs.find((job) => job.id === activeJobId) ?? null
   const activeJobStatus = activeJobDetails?.status ?? activeJob?.status
   const activeUrlChecks = activeJobDetails?.urls ?? []
-  const urlsToCreate = useMemo(
-    () =>
-      urlInput
-        .split('\n')
-        .map((url) => url.trim())
-        .filter(Boolean),
-    [urlInput],
-  )
+  const urlsToCreate = useMemo(() => {
+    const urls = urlInput
+      .split('\n')
+      .map((url) => url.trim())
+      .filter(Boolean)
+    return Array.from(new Set(urls))
+  }, [urlInput])
   const totalSuccess = jobs.reduce((sum, job) => sum + job.stats.success, 0)
   const totalErrors = jobs.reduce((sum, job) => sum + job.stats.error, 0)
   const runningJobs = jobs.filter(
@@ -120,6 +119,7 @@ function App() {
         <aside className="space-y-5">
           <CreateJobForm
             urlInput={urlInput}
+            urlsCount={urlsToCreate.length}
             createError={createError}
             createdJobId={createdJobId}
             isCreatingJob={isCreatingJob}
