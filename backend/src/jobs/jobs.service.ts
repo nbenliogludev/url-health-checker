@@ -16,6 +16,7 @@ const TERMINAL_JOB_STATUSES: JobStatus[] = [
   'failed',
 ];
 const MAX_STORED_JOBS = 100;
+const MAX_JOB_URLS = 1000;
 
 @Injectable()
 export class JobsService {
@@ -163,6 +164,10 @@ export class JobsService {
 
     if (createJobDto.urls.length === 0) {
       throw new BadRequestException('urls must contain at least one URL');
+    }
+
+    if (createJobDto.urls.length > MAX_JOB_URLS) {
+      throw new BadRequestException(`urls cannot exceed ${MAX_JOB_URLS} items`);
     }
 
     return createJobDto.urls.map((url, index) => this.validateUrl(url, index));
