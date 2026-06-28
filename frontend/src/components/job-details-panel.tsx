@@ -127,8 +127,8 @@ export function JobDetailsPanel({
 
           {activeUrlChecks.length > 0 ? (
             <div className="divide-y divide-zinc-200">
-              {activeUrlChecks.map((item) => (
-                <UrlRow key={item.url} item={item} />
+              {activeUrlChecks.map((item, index) => (
+                <UrlRow key={index} item={item} />
               ))}
             </div>
           ) : null}
