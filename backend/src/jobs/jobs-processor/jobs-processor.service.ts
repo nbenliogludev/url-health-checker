@@ -112,7 +112,7 @@ export class JobsProcessorService {
             url,
           },
         },
-        () => fetch(url, { method: 'HEAD' }),
+        () => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(10000) }),
       );
       requestDurationMs = Date.now() - requestStartedAt;
       const headResult =
