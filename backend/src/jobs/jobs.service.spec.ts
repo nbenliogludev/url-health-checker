@@ -109,30 +109,24 @@ describe('JobsService', () => {
   });
 
   it('cleans up old terminal jobs to prevent memory leaks', () => {
-    // Create 102 jobs (status: pending)
     const pendingJobIds: string[] = [];
     for (let i = 0; i < 102; i++) {
       pendingJobIds.push(service.create({ urls: ['https://example.com'] }).jobId);
     }
-    
-    // Complete the first 5 jobs
+
     for (let i = 0; i < 5; i++) {
       service.updateJobStatus(pendingJobIds[i], 'completed');
     }
     
-    // Now create 1 more job. Total size becomes 103. 
-    // The cleanup logic will trigger and remove (103 - 100) = 3 oldest terminal jobs.
     service.create({ urls: ['https://example.com'] });
     
     const allJobs = service.findAll();
     expect(allJobs.length).toBe(100);
     
-    // The first 3 jobs should be removed
     expect(service.findOne(pendingJobIds[0])).toBeUndefined();
     expect(service.findOne(pendingJobIds[1])).toBeUndefined();
     expect(service.findOne(pendingJobIds[2])).toBeUndefined();
     
-    // The 4th and 5th completed jobs should still exist
     expect(service.findOne(pendingJobIds[3])).toBeDefined();
     expect(service.findOne(pendingJobIds[4])).toBeDefined();
   });
