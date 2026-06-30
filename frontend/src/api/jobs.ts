@@ -1,10 +1,24 @@
 import axios from 'axios'
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+const apiBaseUrl = getApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
 
 const apiClient = axios.create({
   baseURL: apiBaseUrl,
 })
+
+function getApiBaseUrl(value?: string) {
+  const baseUrl = value?.trim().replace(/\/+$/, '')
+
+  if (!baseUrl) {
+    return '/api'
+  }
+
+  if (baseUrl.endsWith('/api')) {
+    return baseUrl
+  }
+
+  return `${baseUrl}/api`
+}
 
 export type JobStatus =
   | 'pending'

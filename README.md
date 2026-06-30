@@ -100,7 +100,7 @@ Main variables:
 | `SENTRY_DSN` | Backend Sentry DSN |
 | `VITE_SENTRY_DSN` | Frontend Sentry DSN |
 | `FRONTEND_URL` | Allowed frontend origin for backend CORS, for example `https://url-health-checker-frontend.vercel.app`. |
-| `VITE_API_BASE_URL` | Backend API URL for a separately deployed frontend, for example `https://url-health-checker-backend.vercel.app/api`. If it is not set, the frontend uses `/api`. |
+| `VITE_API_BASE_URL` | Backend URL for a separately deployed frontend, for example `https://url-health-checker-backend.vercel.app`. If it is not set, the frontend uses `/api`. |
 | `JOB_URL_CONCURRENCY_LIMIT` | How many URLs can be checked at the same time inside one job. Default is `5`. |
 
 If `JOB_URL_CONCURRENCY_LIMIT=10`, one job can process up to 10 URLs in parallel. Several jobs can still run at the same time.

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { getAllowedOrigins, isOriginAllowed } from './cors.config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -14,10 +15,17 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
+  const allowedOrigins = getAllowedOrigins(process.env.FRONTEND_URL);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(',')
-      : ['http://localhost:5173', 'http://localhost'],
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin, allowedOrigins)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'), false);
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
